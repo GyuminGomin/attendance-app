@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "NodeNext",            // ✅ ESM
+    "moduleResolution": "NodeNext",
+    "target": "ES2022",
+    "outDir": "dist-electron",       // 컴파일된 JS 위치
+    "rootDir": "electron",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true
+  },
+  "include": ["electron/**/*.ts"]
+}

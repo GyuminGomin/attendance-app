@@ -1,0 +1,29 @@
+{
+  "name": "attendance-app",
+  "private": true,
+  "version": "0.0.0",
+  "main": "dist-electron/main.js",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:vite\" \"npm run dev:electron:ts\" \"npm run dev:electron\"",
+    "dev:vite": "vite",
+    "dev:electron:ts": "tsc -p tsconfig.electron.json -w",
+    "dev:electron": "wait-on http://localhost:5173 && electron .",
+    "build": "vite build && tsc -p tsconfig.electron.json",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "vue": "^3.5.24"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "@vitejs/plugin-vue": "^6.0.1",
+    "@vue/tsconfig": "^0.8.1",
+    "concurrently": "^9.2.1",
+    "electron": "^39.2.3",
+    "typescript": "~5.9.3",
+    "vite": "^7.2.4",
+    "vue-tsc": "^3.1.4",
+    "wait-on": "^9.0.3"
+  }
+}
