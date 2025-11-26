@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "attendance-helper": {
+      "command": "npx",
+      "args": ["tsx", "D:/git/projects/attendance-app/attendance-mcp-server/src/server.ts"],
+      "cwd": "D:/git/projects/attendance-app/front-end",
+      "type": "stdio"
+    }
+  }
+}

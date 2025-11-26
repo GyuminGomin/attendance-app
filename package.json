@@ -1,0 +1,8 @@
+{
+  "name": "attendance-monorepo",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "build": "npm run build --prefix front-end"
+  }
+}
