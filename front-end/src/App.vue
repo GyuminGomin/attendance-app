@@ -1,120 +1,186 @@
 <!-- src/App.vue -->
 <template>
-  <div class="app">
-    <header class="app-header">
-      <h1>출석 & 일정 기록</h1>
-      <p v-if="attendanceInfo">
-        {{ attendanceInfo.date }} 출석:
-        <strong>{{ attendanceInfo.newlyChecked ? '오늘 새로 체크됨 ✅' : '이미 체크됨 ✅' }}</strong>
-      </p>
-    </header>
+  <v-app>
+    <v-app-bar elevation="1" color="primary" density="comfortable">
+      <v-app-bar-title>출석 & 일정 기록</v-app-bar-title>
+      <v-spacer />
+      <v-chip
+        v-if="attendanceInfo"
+        color="success"
+        variant="flat"
+        class="text-white font-weight-medium"
+        prepend-icon="mdi-check-circle"
+      >
+        {{ attendanceInfo.date }} ·
+        {{ attendanceInfo.newlyChecked ? '오늘 새로 체크됨' : '이미 체크됨' }}
+      </v-chip>
+    </v-app-bar>
 
-    <main class="app-main">
-      <CalendarView
-        :year="currentYear"
-        :month="currentMonth"
-        :attendedDates="attendedDates"
-        @changeMonth="onChangeMonth"
-        @selectDate="onSelectDate"
-      />
+    <v-main>
+      <v-container fluid class="py-8 px-4">
+        <v-row
+          align="stretch"
+          justify="center"
+          style="row-gap: 24px; column-gap: 24px;"
+        >
+          <v-col cols="12" lg="7">
+            <v-card elevation="2" class="h-100">
+              <v-card-title class="text-h6 font-weight-bold d-flex align-center">
+                이번 달 출석
+                <v-spacer />
+                <v-chip size="small" color="secondary" variant="tonal">
+                  {{ currentYear }}.{{ String(currentMonth).padStart(2, '0') }}
+                </v-chip>
+              </v-card-title>
+              <v-divider />
+              <v-card-text class="pt-4">
+                <CalendarView
+                  :year="currentYear"
+                  :month="currentMonth"
+                  :attendedDates="attendedDates"
+                  @changeMonth="onChangeMonth"
+                  @selectDate="onSelectDate"
+                />
+              </v-card-text>
+            </v-card>
+          </v-col>
 
-      <section class="event-panel" v-if="selectedDate">
-        <h2>{{ selectedDate }} 일정</h2>
-        <textarea
-          v-model="memo"
-          placeholder="이 날짜의 메모를 적어보세요"
-          rows="8"
-        ></textarea>
+          <v-col cols="12" lg="5">
+            <v-card elevation="2" class="h-100 d-flex flex-column">
+              <v-card-title class="text-h6 font-weight-bold">
+                {{ selectedDate ? `${selectedDate} 일정` : '날짜를 선택해주세요' }}
+              </v-card-title>
+              <v-divider />
+              <v-card-text class="flex-grow-1 d-flex flex-column">
+                <v-alert
+                  v-if="!selectedDate"
+                  type="info"
+                  variant="tonal"
+                  border="start"
+                  class="mt-3"
+                >
+                  달력에서 날짜를 선택하면 메모를 작성할 수 있어요.
+                </v-alert>
 
-        <button @click="saveMemo">저장</button>
-      </section>
-    </main>
-  </div>
+                <v-textarea
+                  v-else
+                  v-model="memo"
+                  placeholder="이 날짜의 메모를 입력하세요"
+                  variant="outlined"
+                  auto-grow
+                  rows="8"
+                  class="mt-3 flex-grow-1"
+                />
+              </v-card-text>
+              <v-card-actions class="justify-end">
+                <v-btn
+                  color="primary"
+                  :disabled="!selectedDate || saving"
+                  :loading="saving"
+                  prepend-icon="mdi-content-save"
+                  @click="saveMemo"
+                >
+                  저장
+                </v-btn>
+              </v-card-actions>
+            </v-card>
+          </v-col>
+        </v-row>
+      </v-container>
+    </v-main>
+
+    <v-snackbar
+      v-model="snackbar.show"
+      :color="snackbar.color"
+      timeout="2500"
+      location="bottom"
+    >
+      {{ snackbar.message }}
+    </v-snackbar>
+  </v-app>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
 import CalendarView from './components/CalendarView.vue';
 
-const today = new Date();
-const currentYear = ref(today.getFullYear());
-const currentMonth = ref(today.getMonth() + 1); // 1~12
+type SnackbarState = {
+  show: boolean;
+  message: string;
+  color: string;
+};
 
-const attendanceInfo = ref<null | { date: string; newlyChecked: boolean }>(null);
+const today = new Date();
+const currentYear = ref<number>(today.getFullYear());
+const currentMonth = ref<number>(today.getMonth() + 1); // 1~12
+
+const attendanceInfo = ref<{ date: string; newlyChecked: boolean } | null>(null);
 const attendedDates = ref<string[]>([]);
 
 const selectedDate = ref<string | null>(null);
-const memo = ref('');
+const memo = ref<string>('');
+const saving = ref<boolean>(false);
+const snackbar = ref<SnackbarState>({
+  show: false,
+  message: '',
+  color: 'success'
+});
 
-async function loadMonthAttendance() {
+const loadMonthAttendance = async (): Promise<void> => {
   const dates = await window.api.getMonthAttendance(currentYear.value, currentMonth.value);
   attendedDates.value = dates;
-}
+};
 
-async function onSelectDate(dateStr: string) {
+const onSelectDate = async (dateStr: string): Promise<void> => {
   selectedDate.value = dateStr;
   const events = await window.api.getEventsByDate(dateStr);
 
-  // 여기서는 간단하게 "하루에 메모 하나" 모델로 감
   if (events.length > 0 && events[0].memo) {
     memo.value = events[0].memo;
   } else {
     memo.value = '';
   }
-}
+};
 
-async function saveMemo() {
-  if (!selectedDate.value) return;
+const showSnackbar = (message: string, color: SnackbarState['color'] = 'success'): void => {
+  snackbar.value = { show: true, message, color };
+};
 
-  const events = memo.value.trim()
-    ? [{ id: 1, title: '메모', memo: memo.value }]
-    : [];
-  await window.api.saveEventsByDate(selectedDate.value, events);
-  alert('저장되었습니다!');
-}
+const saveMemo = async (): Promise<void> => {
+  if (!selectedDate.value || saving.value) return;
 
-function onChangeMonth(payload: { year: number; month: number }) {
+  saving.value = true;
+  try {
+    const events = memo.value.trim()
+      ? [{ id: 1, title: '메모', memo: memo.value }]
+      : [];
+    await window.api.saveEventsByDate(selectedDate.value, events);
+    showSnackbar('저장되었습니다!');
+  } catch (error) {
+    console.error(error);
+    showSnackbar('저장에 실패했어요. 다시 시도해주세요.', 'error');
+  } finally {
+    saving.value = false;
+  }
+};
+
+const onChangeMonth = (payload: { year: number; month: number }): void => {
   currentYear.value = payload.year;
   currentMonth.value = payload.month;
-}
+};
 
 onMounted(async () => {
-  // 1. 오늘 출석 체크
   const result = await window.api.checkTodayAttendance();
   attendanceInfo.value = {
     date: result.date,
     newlyChecked: result.newlyChecked
   };
 
-  // 2. 현재 월 출석 정보 로드
   await loadMonthAttendance();
 });
 
-// 월이 바뀔 때마다 출석 정보 다시 로드
 watch([currentYear, currentMonth], () => {
   loadMonthAttendance();
 });
 </script>
 
-<style scoped>
-.app {
-  padding: 16px;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-}
-.app-header {
-  margin-bottom: 16px;
-}
-.app-main {
-  display: flex;
-  gap: 16px;
-}
-.event-panel {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-.event-panel textarea {
-  flex: 1;
-  margin-bottom: 8px;
-}
-</style>

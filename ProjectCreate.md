@@ -134,3 +134,6 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 }
 ```
+
+# 참고 : 이 사이트를 꼭 보고 블로그 글 수정 필요
+- https://v3-docs.vuejs-korea.org/guide/typescript/overview.html

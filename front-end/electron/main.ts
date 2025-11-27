@@ -4,30 +4,30 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __filename = fileURLToPath(import.meta.url); // 메타데이터 : 현재 파일의 경로
+const __dirname = path.dirname(__filename); // 현재 파일의 디렉토리 경로
 
-let mainWindow: BrowserWindow | null = null;
+let mainWindow: BrowserWindow | null = null; // Ts의 유니온 타입 문법
 
 function getDataDir() {
-  return app.getPath('userData'); // 윈도우에서 사용자별 AppData\Roaming\... 경로
+  return app.getPath('userData'); // OS별로 앱 데이터를 저장할 기본 디렉터리 (윈도우 : AppData\Roaming\..., 맥 : ~/Library/Application Support/..., 리눅스 : ~/.config/...)
 }
 
 function ensureFile(fileName: string, defaultContent: any) {
   const filePath = path.join(getDataDir(), fileName);
-  if (!fs.existsSync(filePath)) {
-    fs.writeFileSync(filePath, JSON.stringify(defaultContent, null, 2), 'utf-8');
+  if (!fs.existsSync(filePath)) { // 파일이 존재하지 않으면 json 파일 생성
+    fs.writeFileSync(filePath, JSON.stringify(defaultContent, null, 2), 'utf-8'); // JSON.stringify : 객체를 JSON 문자열로 변환
   }
   return filePath;
 }
 
 // --- 출석/일정 JSON 파일 경로
 function getAttendanceFile() {
-  return ensureFile('attendance.json', {}); // { "2025-11-24": true, ... }
+  return ensureFile('attendance.json', {}); // attendance.json 파일 경로
 }
 
 function getEventsFile() {
-  return ensureFile('events.json', {}); // { "2025-11-24": [{title, memo}], ... }
+  return ensureFile('events.json', {}); // events.json 파일 경로
 }
 
 // --- 유틸 함수

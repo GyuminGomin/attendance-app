@@ -1,39 +1,72 @@
 <!-- src/components/CalendarView.vue -->
 <template>
-  <div class="calendar">
+  <v-sheet class="calendar" rounded="xl" elevation="0" color="transparent">
     <div class="calendar-header">
-      <button @click="prevMonth">&lt;</button>
-      <div>{{ year }}년 {{ month }}월</div>
-      <button @click="nextMonth">&gt;</button>
+      <v-btn
+        icon="mdi-chevron-left"
+        variant="tonal"
+        color="primary"
+        density="comfortable"
+        aria-label="이전 달"
+        @click="prevMonth"
+      />
+
+      <div class="calendar-header__label">
+        {{ year }}년 {{ month }}월
+      </div>
+
+      <v-btn
+        icon="mdi-chevron-right"
+        variant="tonal"
+        color="primary"
+        density="comfortable"
+        aria-label="다음 달"
+        @click="nextMonth"
+      />
     </div>
 
     <div class="calendar-grid">
-      <div class="weekday" v-for="w in weekdays" :key="w">{{ w }}</div>
+      <div class="calendar-weekday" v-for="w in weekdays" :key="w">
+        {{ w }}
+      </div>
 
       <div
         v-for="blank in startWeekday"
         :key="'blank-' + blank"
-        class="day blank"
+        class="calendar-blank"
       ></div>
 
-      <div
+      <v-btn
         v-for="day in daysInMonth"
         :key="day"
-        class="day"
+        class="calendar-day"
         :class="{
-          today: isToday(day),
-          attended: isAttended(day)
+          'calendar-day--today': isToday(day),
+          'calendar-day--attended': isAttended(day)
         }"
+        :variant="isToday(day) ? 'tonal' : 'text'"
+        :color="isAttended(day) ? 'success' : isToday(day) ? 'primary' : undefined"
+        block
+        rounded="lg"
+        elevation="0"
         @click="onClickDay(day)"
       >
-        {{ day }}
-      </div>
+        <span class="calendar-day__label">
+          {{ day }}
+          <v-icon
+            v-if="isAttended(day)"
+            icon="mdi-check-circle"
+            size="16"
+            class="ml-1"
+          />
+        </span>
+      </v-btn>
     </div>
-  </div>
+  </v-sheet>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, toRefs } from 'vue';
 
 interface Props {
   year: number;
@@ -46,21 +79,20 @@ const emit = defineEmits<{
   (e: 'selectDate', dateStr: string): void;
 }>();
 
-const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
+const { year, month, attendedDates } = toRefs(props);
 
-const daysInMonth = computed(() => {
-  return new Date(props.year, props.month, 0).getDate();
-});
+const weekdays = ['일', '월', '화', '수', '목', '금', '토'] as const;
 
-const startWeekday = computed(() => {
-  // 해당 월 1일의 요일 (0: 일 ~ 6: 토)
-  const d = new Date(props.year, props.month - 1, 1);
-  return d.getDay();
+const daysInMonth = computed<number>(() => new Date(year.value, month.value, 0).getDate());
+
+const startWeekday = computed<number>(() => {
+  const firstDay = new Date(year.value, month.value - 1, 1);
+  return firstDay.getDay();
 });
 
 function formatDate(day: number) {
-  const yyyy = props.year;
-  const mm = String(props.month).padStart(2, '0');
+  const yyyy = year.value;
+  const mm = String(month.value).padStart(2, '0');
   const dd = String(day).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
 }
@@ -68,20 +100,20 @@ function formatDate(day: number) {
 function isToday(day: number) {
   const today = new Date();
   return (
-    today.getFullYear() === props.year &&
-    today.getMonth() + 1 === props.month &&
+    today.getFullYear() === year.value &&
+    today.getMonth() + 1 === month.value &&
     today.getDate() === day
   );
 }
 
 function isAttended(day: number) {
   const dateStr = formatDate(day);
-  return props.attendedDates.includes(dateStr);
+  return attendedDates.value.includes(dateStr);
 }
 
 function prevMonth() {
-  let y = props.year;
-  let m = props.month - 1;
+  let y = year.value;
+  let m = month.value - 1;
   if (m === 0) {
     m = 12;
     y -= 1;
@@ -90,8 +122,8 @@ function prevMonth() {
 }
 
 function nextMonth() {
-  let y = props.year;
-  let m = props.month + 1;
+  let y = year.value;
+  let m = month.value + 1;
   if (m === 13) {
     m = 1;
     y += 1;
@@ -104,40 +136,6 @@ function onClickDay(day: number) {
   emit('selectDate', dateStr);
 }
 </script>
-
-<style scoped>
-.calendar {
-  width: 360px;
-}
-.calendar-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-.calendar-grid {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 4px;
-}
-.weekday {
-  text-align: center;
-  font-weight: bold;
-}
-.day {
-  text-align: center;
-  padding: 6px 0;
-  border-radius: 4px;
-  cursor: pointer;
-  user-select: none;
-}
-.day.today {
-  outline: 2px solid #888;
-}
-.day.attended {
-  background-color: #b3e6b3;
-}
-.day.blank {
-  visibility: hidden;
-}
+<style scoped lang="scss">
+@use '../scss/components/calendar.scss';
 </style>
