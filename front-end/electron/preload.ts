@@ -14,6 +14,9 @@ contextBridge.exposeInMainWorld('api', {
   saveEventsByDate: (date: string, events: any[]) => {
     return ipcRenderer.invoke('events:saveByDate', { date, events });
   }
+  getAllAttendance: () => {
+    return ipcRenderer.invoke('events:getAllAttendance');
+  }
 });
 
 declare global {

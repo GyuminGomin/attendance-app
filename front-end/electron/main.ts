@@ -82,13 +82,16 @@ function registerIpcHandlers() {
 
     if (!data[today]) {
       data[today] = {
-        checked: true,
-        checkedAt: new Date().toISOString()
+        checked: false,
+        checkedAt: null,
+        newlyChecked: false,
+        updatedAt: null
       };
       writeJson(file, data);
-      return { checked: true, newlyChecked: true, date: today };
-    } else {
-      return { checked: true, newlyChecked: false, date: today };
+      return { checked: data[today].checked, newlyChecked: data[today].newlyChecked, date: today };
+    } 
+    else {
+      return { checked: data[today].checked, newlyChecked: data[today].newlyChecked, date: today };
     }
   });
 
@@ -118,12 +121,41 @@ function registerIpcHandlers() {
   // 4) 특정 날짜 일정 저장
   ipcMain.handle('events:saveByDate', (_event, payload: { date: string; events: any[] }) => {
     const { date, events } = payload;
-    const file = getEventsFile();
-    const data = readJson(file);
+    const file1 = getAttendanceFile();
+    const data1 = readJson(file1);
+    const file2 = getEventsFile();
+    const data2 = readJson(file2);
+    if (!data1[date].checked) {
+      data1[date].checked = true;
+      data1[date].newlyChecked = true;
+      data1[date].checkedAt = new Date().toISOString();
+    } else {
+      data1[date].newlyChecked = false;
+      data1[date].updatedAt = new Date().toISOString();
+    }
+    data2[date] = events;
+    writeJson(file1, data1);
+    writeJson(file2, data2);
+    return { success: true; checked: data1[date].checked, newlyChecked: data1[date].newlyChecked };
+  });
 
-    data[date] = events;
-    writeJson(file, data);
-    return { success: true };
+  // 5) 모든 날짜와 메모 내용 가져오기
+  ipcMain.handle('events:getAllAttendance', () => {
+    const file1 = getAttendanceFile();
+    const file2 = getEventsFile();
+    const data1 = readJson(file1);
+    const data2 = readJson(file2);
+
+    const mergedDate = {};
+
+    Object.keys(data1).forEach(date => {
+      mergedDate[date] = {
+        ...data1[date],
+        ...data2[date][0]
+      };
+    });
+
+    return mergedDate;
   });
 }
 

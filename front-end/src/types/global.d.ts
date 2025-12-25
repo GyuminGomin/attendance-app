@@ -14,7 +14,16 @@ declare global {
       saveEventsByDate: (
         date: string,
         events: any[]
-      ) => Promise<{ success: boolean }>;
+      ) => Promise<{ success: boolean; checked: boolean; newlyChecked: boolean }>;
+      getAllAttendance: () => Promise<Record<string, {
+        checked: boolean;
+        checkedAt: string;
+        newlyChecked: boolean;
+        updatedAt: string;
+        id: number;
+        title: string;
+        memo: string;
+      }>>;
     };
   }
 }

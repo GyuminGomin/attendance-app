@@ -10,5 +10,5 @@
     "allowSyntheticDefaultImports": true,
     "strict": true
   },
-  "include": ["electron/**/*.ts"]
+  "include": ["electron/main.ts"]
 }

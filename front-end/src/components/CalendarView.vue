@@ -42,10 +42,12 @@
         class="calendar-day"
         :class="{
           'calendar-day--today': isToday(day),
-          'calendar-day--attended': isAttended(day)
+          'calendar-day--attended': isAttended(day),
+          'calendar-day--memo': !isChecked(day) && hasMemo(day),
+          'calendar-day--selected': isSelected(day),
         }"
-        :variant="isToday(day) ? 'tonal' : 'text'"
-        :color="isAttended(day) ? 'success' : isToday(day) ? 'primary' : undefined"
+        :variant="isSelected(day) ? 'tonal' : isToday(day) ? 'tonal' : 'text'"
+        :color="isChecked(day) ? 'success' : isSelected(day) ? 'primary' : isToday(day) ? 'primary' : undefined"
         block
         rounded="lg"
         elevation="0"
@@ -54,8 +56,14 @@
         <span class="calendar-day__label">
           {{ day }}
           <v-icon
-            v-if="isAttended(day)"
+            v-if="isChecked(day)"
             icon="mdi-check-circle"
+            size="16"
+            class="ml-1"
+          />
+          <v-icon
+            v-else="hasMemo(day)"
+            icon="mdi-note-text-outline"
             size="16"
             class="ml-1"
           />
@@ -72,6 +80,8 @@ interface Props {
   year: number;
   month: number;
   attendedDates: string[]; // "YYYY-MM-DD" 배열
+  attendanceMap: Record<string, { checked: boolean; memo?: string }>;
+  selectedDate: string | null;
 }
 const props = defineProps<Props>();
 const emit = defineEmits<{
@@ -89,6 +99,23 @@ const startWeekday = computed<number>(() => {
   const firstDay = new Date(year.value, month.value - 1, 1);
   return firstDay.getDay();
 });
+
+function getState(day: number) {
+  const dateStr = formatDate(day);
+  return props.attendanceMap[dateStr]; // 없으면 undefined
+}
+
+function isChecked(day: number) {
+  return !!getState(day)?.checked
+}
+
+function hasMemo(day: number) {
+  return !!getState(day)?.memo?.trim()
+}
+
+function isSelected(day: number) {
+  return props.selectedDate === formatDate(day);
+}
 
 function formatDate(day: number) {
   const yyyy = year.value;

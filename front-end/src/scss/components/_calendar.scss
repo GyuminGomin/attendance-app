@@ -43,7 +43,18 @@
     min-height: 52px;
     border-radius: 14px !important;
     background-color: #ffffff;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+
+    &:active {
+      transform: scale(0.98);
+    }
+
+    &--selected {
+      transform: translateY(-2px);
+      box-shadow:
+        0 0 0 3px rgba(79, 70, 229, 0.35),
+        0 10px 22px rgba(15, 23, 42, 0.18);
+    }
 
     &:hover {
       transform: translateY(-2px);

@@ -7,9 +7,9 @@
   "scripts": {
     "dev": "concurrently \"npm run dev:vite\" \"npm run dev:electron:ts\" \"npm run dev:electron\"",
     "dev:vite": "vite",
-    "dev:electron:ts": "tsc -p tsconfig.electron.json -w",
+    "dev:electron:ts": "concurrently \"tsc -p tsconfig.electron.json -w\" \"tsc -p tsconfig.preload.json -w\"",
     "dev:electron": "wait-on http://localhost:5173 && electron .",
-    "build": "vite build && tsc -p tsconfig.electron.json",
+    "build": "vite build && tsc -p tsconfig.electron.json && tsc -p tsconfig.preload.json",
     "preview": "vite preview"
   },
   "dependencies": {
