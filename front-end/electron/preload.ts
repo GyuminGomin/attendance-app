@@ -13,7 +13,7 @@ contextBridge.exposeInMainWorld('api', {
   },
   saveEventsByDate: (date: string, events: any[]) => {
     return ipcRenderer.invoke('events:saveByDate', { date, events });
-  }
+  },
   getAllAttendance: () => {
     return ipcRenderer.invoke('events:getAllAttendance');
   }
@@ -26,6 +26,7 @@ declare global {
       getMonthAttendance: (year: number, month: number) => Promise<string[]>;
       getEventsByDate: (date: string) => Promise<any[]>;
       saveEventsByDate: (date: string, events: any[]) => Promise<{ success: boolean }>;
+      getAllAttendance: () => Promise<{ checked: boolean; checkedAt: string; newlyChecked: boolean; updatedAt: string; id: number; title: string; memo: string }>
     };
   }
 }
