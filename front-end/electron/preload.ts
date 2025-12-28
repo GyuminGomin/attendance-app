@@ -16,17 +16,29 @@ contextBridge.exposeInMainWorld('api', {
   },
   getAllAttendance: () => {
     return ipcRenderer.invoke('events:getAllAttendance');
+  },
+  openMarkdownViewer: () => {
+    return ipcRenderer.invoke('markdown:openViewer');
+  },
+  closeMarkdownViewer: () => {
+    return ipcRenderer.invoke('markdown:closeViewer');
+  },
+  readReadme: () => {
+    return ipcRenderer.invoke('markdown:readReadme');
   }
 });
 
 declare global {
   interface Window {
     api: {
-      checkTodayAttendance: () => Promise<{ checked: boolean; newlyChecked: boolean; date: string }>;
+      checkTodayAttendance: () => Promise<{ checked: boolean; newlyChecked: boolean; date: string; checkedAt: string; updatedAt: string }>;
       getMonthAttendance: (year: number, month: number) => Promise<string[]>;
-      getEventsByDate: (date: string) => Promise<any[]>;
-      saveEventsByDate: (date: string, events: any[]) => Promise<{ success: boolean }>;
-      getAllAttendance: () => Promise<{ checked: boolean; checkedAt: string; newlyChecked: boolean; updatedAt: string; id: number; title: string; memo: string }>
+      getEventsByDate: (date: string) => Promise<{ id: number; title: string; memo: string }>;
+      saveEventsByDate: (date: string, events: Promise<{ id: number; title: string; memo: string }>) => Promise<{ success: boolean; checked: boolean; newlyChecked: boolean }>;
+      getAllAttendance: () => Promise<{ checked: boolean; checkedAt: string; newlyChecked: boolean; updatedAt: string; id: number; title: string; memo: string }>;
+      openMarkdownViewer: () => Promise<{ success: boolean }>;
+      closeMarkdownViewer: () => Promise<{ success: boolean }>;
+      readReadme: () => Promise<{ success: boolean; content: string }>;
     };
   }
 }

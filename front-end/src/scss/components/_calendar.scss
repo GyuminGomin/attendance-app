@@ -56,6 +56,20 @@
         0 10px 22px rgba(15, 23, 42, 0.18);
     }
 
+    &:focus-visible {
+      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.45);
+    }
+
+    &--checked {
+      background: linear-gradient(135deg, #bef264, #86efac);
+      color: #14532d;
+    }
+
+    &--memo {
+      background: linear-gradient(135deg, #fde68a, #fef3c7) !important;
+      color: #92400e;
+    }
+
     &:hover {
       transform: translateY(-2px);
       box-shadow: 0 6px 14px rgba(15, 23, 42, 0.15);

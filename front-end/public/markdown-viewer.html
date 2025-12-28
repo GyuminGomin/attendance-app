@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>README - 마크다운 뷰어</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        line-height: 1.6;
+        color: #333;
+        background: #f5f5f5;
+        padding: 20px;
+      }
+      
+      .container {
+        max-width: 900px;
+        margin: 0 auto;
+        background: white;
+        padding: 40px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+      
+      h1 {
+        color: #1976d2;
+        border-bottom: 3px solid #1976d2;
+        padding-bottom: 10px;
+        margin-bottom: 20px;
+      }
+      
+      h2 {
+        color: #424242;
+        margin-top: 30px;
+        margin-bottom: 15px;
+        border-bottom: 2px solid #e0e0e0;
+        padding-bottom: 8px;
+      }
+      
+      h3 {
+        color: #616161;
+        margin-top: 20px;
+        margin-bottom: 10px;
+      }
+      
+      p {
+        margin-bottom: 12px;
+      }
+      
+      a {
+        color: #1976d2;
+        text-decoration: none;
+      }
+      
+      a:hover {
+        text-decoration: underline;
+      }
+      
+      code {
+        background: #f5f5f5;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-family: 'Courier New', monospace;
+        font-size: 0.9em;
+      }
+      
+      pre {
+        background: #f5f5f5;
+        padding: 15px;
+        border-radius: 5px;
+        overflow-x: auto;
+        margin: 15px 0;
+      }
+      
+      pre code {
+        background: none;
+        padding: 0;
+      }
+      
+      ul, ol {
+        margin-left: 20px;
+        margin-bottom: 12px;
+      }
+      
+      li {
+        margin-bottom: 8px;
+      }
+      
+      blockquote {
+        border-left: 4px solid #1976d2;
+        padding-left: 15px;
+        margin: 15px 0;
+        color: #666;
+        font-style: italic;
+      }
+      
+      .loading {
+        text-align: center;
+        padding: 40px;
+        color: #666;
+      }
+      
+      .error {
+        color: #d32f2f;
+        padding: 20px;
+        background: #ffebee;
+        border-radius: 5px;
+        margin: 20px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div id="content" class="loading">로딩 중...</div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
+    <script>
+      async function loadReadme() {
+        const contentDiv = document.getElementById('content');
+        
+        try {
+          // Electron API를 통해 README.md 읽기
+          if (window.api && window.api.readReadme) {
+            const result = await window.api.readReadme();
+            if (result.success && result.content) {
+              // 마크다운을 HTML로 변환
+              const html = marked.parse(result.content);
+              contentDiv.innerHTML = html;
+            } else {
+              contentDiv.className = 'error';
+              contentDiv.textContent = 'README.md 파일을 읽을 수 없습니다.';
+            }
+          } else {
+            // 개발 환경에서 직접 fetch 시도
+            try {
+              const response = await fetch('/README.md');
+              if (response.ok) {
+                const text = await response.text();
+                const html = marked.parse(text);
+                contentDiv.innerHTML = html;
+              } else {
+                throw new Error('파일을 찾을 수 없습니다.');
+              }
+            } catch (fetchError) {
+              contentDiv.className = 'error';
+              contentDiv.textContent = 'README.md 파일을 읽을 수 없습니다.';
+            }
+          }
+        } catch (error) {
+          console.error('Error loading README:', error);
+          contentDiv.className = 'error';
+          contentDiv.textContent = '오류가 발생했습니다: ' + error.message;
+        }
+      }
+      
+      // marked와 window.api가 로드될 때까지 대기
+      function tryLoadReadme() {
+        if (typeof marked !== 'undefined') {
+          // window.api가 아직 로드되지 않았을 수 있으므로 약간의 지연 후 시도
+          if (window.api && window.api.readReadme) {
+            loadReadme();
+          } else {
+            // window.api가 로드될 때까지 대기 (최대 2초)
+            let attempts = 0;
+            const maxAttempts = 20;
+            const checkApi = setInterval(() => {
+              attempts++;
+              if (window.api && window.api.readReadme) {
+                clearInterval(checkApi);
+                loadReadme();
+              } else if (attempts >= maxAttempts) {
+                clearInterval(checkApi);
+                // API가 없으면 fetch로 시도
+                loadReadme();
+              }
+            }, 100);
+          }
+        } else {
+          // marked가 로드되지 않았으면 에러 표시
+          contentDiv.className = 'error';
+          contentDiv.textContent = '마크다운 라이브러리를 로드할 수 없습니다.';
+        }
+      }
+      
+      // DOM이 로드된 후 실행
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', tryLoadReadme);
+      } else {
+        tryLoadReadme();
+      }
+    </script>
+  </body>
+</html>
+

@@ -17,5 +17,14 @@ electron_1.contextBridge.exposeInMainWorld('api', {
     },
     getAllAttendance: () => {
         return electron_1.ipcRenderer.invoke('events:getAllAttendance');
+    },
+    openMarkdownViewer: () => {
+        return electron_1.ipcRenderer.invoke('markdown:openViewer');
+    },
+    closeMarkdownViewer: () => {
+        return electron_1.ipcRenderer.invoke('markdown:closeViewer');
+    },
+    readReadme: () => {
+        return electron_1.ipcRenderer.invoke('markdown:readReadme');
     }
 });

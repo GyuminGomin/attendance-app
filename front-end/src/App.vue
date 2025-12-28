@@ -4,6 +4,15 @@
     <v-app-bar elevation="1" color="primary" density="comfortable">
       <v-app-bar-title>출석 & 일정 기록</v-app-bar-title>
       <v-spacer />
+      <v-btn
+        :icon="markdownViewerOpen ? 'mdi-eye-off' : 'mdi-eye'"
+        :color="markdownViewerOpen ? 'success' : 'default'"
+        variant="text"
+        size="small"
+        class="mr-2"
+        @click="toggleMarkdownViewer"
+        :title="markdownViewerOpen ? '마크다운 뷰어 닫기' : '마크다운 뷰어 열기'"
+      />
       <v-chip
         v-if="attendanceInfo && selectedDate == getTodayStr()"
         color="success"
@@ -11,8 +20,24 @@
         class="text-white font-weight-medium"
         prepend-icon="mdi-check-circle"
       >
-        {{ attendanceInfo.date }} ·
-        {{ !attendanceInfo.checked ? '저장되지 않음' : attendanceInfo.newlyChecked ? '오늘 새로 저장됨' : '수정됨' }}
+        <template v-if="!attendanceInfo.checked && !memo.trim()">
+          {{ attendanceInfo.date }} · 저장되지 않음
+        </template>
+        <template v-else-if="!attendanceInfo.checked && memo.trim()">
+          {{ attendanceInfo.date }} · 수정중
+        </template>
+        <template v-else-if="attendanceInfo.checked && attendanceInfo.newlyChecked && memo.trim() === savedMemo.trim()">
+          {{ attendanceInfo.date }} · 오늘 새로 저장됨 · {{ formatDateTime(attendanceInfo.checkedAt) }}
+        </template>
+        <template v-else-if="attendanceInfo.checked && !attendanceInfo.newlyChecked && memo.trim() !== savedMemo.trim()">
+          {{ attendanceInfo.date }} · 수정중
+        </template>
+        <template v-else-if="attendanceInfo.checked && !attendanceInfo.newlyChecked && memo.trim() === savedMemo.trim()">
+          {{ attendanceInfo.date }} · 수정됨 · 수정: {{ formatDateTime(attendanceInfo.updatedAt) }}
+        </template>
+        <template v-else>
+          {{ attendanceInfo.date }} · 저장됨
+        </template>
       </v-chip>
     </v-app-bar>
 
@@ -40,6 +65,7 @@
                   :attendedDates="attendedDates"
                   :attendanceMap="attendanceMap"
                   :selectedDate="selectedDate"
+                  :draftDates="draftDates"
                   @changeMonth="onChangeMonth"
                   @selectDate="onSelectDate"
                 />
@@ -53,26 +79,51 @@
                 {{ selectedDate ? `${selectedDate} 일정` : '날짜를 선택해주세요' }}
               </v-card-title>
               <v-divider />
-              <v-card-text class="flex-grow-1 d-flex flex-column">
+              <v-card-text class="flex-grow-1 d-flex flex-column pa-0">
                 <v-alert
                   v-if="!selectedDate"
                   type="info"
                   variant="tonal"
                   border="start"
-                  class="mt-3"
+                  class="mt-3 mx-3"
                 >
                   달력에서 날짜를 선택하면 메모를 작성할 수 있어요.
                 </v-alert>
 
-                <v-textarea
-                  v-else
-                  v-model="memo"
-                  placeholder="이 날짜의 메모를 입력하세요"
-                  variant="outlined"
-                  auto-grow
-                  rows="8"
-                  class="mt-3 flex-grow-1"
-                />
+                <template v-else>
+                  <v-tabs v-model="memoTab" density="compact" class="px-3 pt-3">
+                    <v-tab value="edit">
+                      <v-icon start>mdi-pencil</v-icon>
+                      편집
+                    </v-tab>
+                    <v-tab value="preview">
+                      <v-icon start>mdi-eye</v-icon>
+                      미리보기
+                    </v-tab>
+                  </v-tabs>
+                  
+                  <v-window v-model="memoTab" class="flex-grow-1">
+                    <v-window-item value="edit" class="h-100">
+                      <v-textarea
+                        v-model="memo"
+                        placeholder="이 날짜의 메모를 입력하세요 (마크다운 지원)"
+                        variant="outlined"
+                        auto-grow
+                        rows="11"
+                        max-height="300"
+                        class="mt-3 mx-3 memo-textarea"
+                        hide-details
+                      />
+                    </v-window-item>
+                    
+                    <v-window-item value="preview" class="h-100">
+                      <div 
+                        class="markdown-preview mt-3 mx-3 pa-4"
+                        v-html="renderedMarkdown"
+                      />
+                    </v-window-item>
+                  </v-window>
+                </template>
               </v-card-text>
               <v-card-actions class="justify-end">
                 <v-btn
@@ -103,10 +154,11 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { marked } from 'marked';
 import CalendarView from './components/CalendarView.vue';
 
-import { getTodayStr } from './utils/date';
+import { getTodayStr, formatDateTime } from './utils/date';
 
 type SnackbarState = {
   show: boolean;
@@ -118,17 +170,73 @@ const today = new Date();
 const currentYear = ref<number>(today.getFullYear());
 const currentMonth = ref<number>(today.getMonth() + 1); // 1~12
 
-const attendanceInfo = ref<{ date: string; checked: boolean;  newlyChecked: boolean } | null>(null);
+const attendanceInfo = ref<{ date: string; checked: boolean;  newlyChecked: boolean; checkedAt: string | null; updatedAt: string | null } | null>(null);
 const attendedDates = ref<string[]>([]);
 const attendanceMap = ref<Record<string, { checked: boolean; checkedAt: string; newlyChecked: boolean; updatedAt: string; id: number; title: string; memo: string }>>({})
 
 const selectedDate = ref<string | null>(null);
 const memo = ref<string>('');
 const saving = ref<boolean>(false);
+const savedMemo = ref<string>(''); // 현재 선택된 날짜의 저장된 메모 (비교용)
 const snackbar = ref<SnackbarState>({
   show: false,
   message: '',
   color: 'success'
+});
+
+// 마크다운 뷰어 토글 상태
+const markdownViewerOpen = ref<boolean>(false);
+const MARKDOWN_VIEWER_TOGGLE_KEY = 'attendance-app-markdown-viewer-toggle';
+
+// 메모 탭 상태 (편집/미리보기)
+const memoTab = ref<string>('edit');
+
+// 마크다운 렌더링
+const renderedMarkdown = computed<string>(() => {
+  if (!memo.value.trim()) {
+    return '<p class="text-grey">내용이 없습니다.</p>';
+  }
+  try {
+    // marked.parse는 동기 함수이지만 타입 정의가 Promise를 반환할 수 있도록 되어 있을 수 있음
+    const result = marked.parse(memo.value);
+    // Promise인 경우 처리
+    if (result instanceof Promise) {
+      return '<p class="text-grey">로딩 중...</p>';
+    }
+    return result as string;
+  } catch (error) {
+    console.error('Markdown parsing error:', error);
+    return '<p class="text-error">마크다운 파싱 오류가 발생했습니다.</p>';
+  }
+});
+
+// 임시데이터가 있는 날짜 목록 (CalendarView에서 색상 표시용)
+const draftDates = computed<string[]>(() => {
+  const todayStr = getTodayStr();
+  const dates: string[] = [];
+  
+  // 오늘 날짜의 임시데이터 상태 확인
+  // localStorage에서 임시 메모 확인
+  const draftMemo = loadDraftMemo(todayStr);
+  const hasDraftInStorage = draftMemo !== null && draftMemo.trim() !== '';
+  
+  // 현재 선택된 날짜가 오늘일 때
+  if (selectedDate.value === todayStr) {
+    // 저장 안됨 + 메모 있음
+    if (!attendanceInfo.value?.checked && memo.value.trim()) {
+      dates.push(todayStr);
+    }
+    // 저장됨 + 수정 중 (메모가 저장된 메모와 다름)
+    else if (attendanceInfo.value?.checked && memo.value.trim() !== savedMemo.value.trim()) {
+      dates.push(todayStr);
+    }
+  } 
+  // 오늘 날짜가 선택되지 않았지만 localStorage에 임시데이터가 있는 경우
+  else if (hasDraftInStorage) {
+    dates.push(todayStr);
+  }
+  
+  return dates;
 });
 
 // localStorage 키 생성 헬퍼
@@ -221,11 +329,17 @@ const onSelectDate = async (dateStr: string): Promise<void> => {
   
   // 먼저 저장된 메모를 불러오기
   const events = await window.api.getEventsByDate(dateStr);
-  const savedMemo = events.length > 0 && events[0].memo ? events[0].memo : '';
+  const currentSavedMemo = events && events.length > 0 && events[0]?.memo ? events[0].memo : '';
+  savedMemo.value = currentSavedMemo;
   
   // 오늘 날짜이고 임시 메모가 있으면 우선 표시, 없으면 저장된 메모 표시
   const draftMemo = loadDraftMemo(dateStr);
-  memo.value = draftMemo !== null ? draftMemo : savedMemo;
+  memo.value = draftMemo !== null ? draftMemo : currentSavedMemo;
+  
+  // 오늘 날짜일 때 attendanceInfo 업데이트
+  if (dateStr === getTodayStr()) {
+    await updateAttendanceInfo();
+  }
 };
 
 const showSnackbar = async (message: string, color: SnackbarState['color'] = 'success'): Promise<void> => {
@@ -259,9 +373,22 @@ const saveMemo = async (): Promise<void> => {
       if (attendanceInfo.value) {
         attendanceInfo.value.checked = result.checked;
         attendanceInfo.value.newlyChecked = result.newlyChecked;
+        // checkedAt은 새로 저장된 경우에만 업데이트
+        if (result.checkedAt) {
+          attendanceInfo.value.checkedAt = result.checkedAt;
+        }
+        // updatedAt은 수정 시에만 업데이트됨 (첫 저장 시에는 null)
+        attendanceInfo.value.updatedAt = result.updatedAt || null;
       }
+      // 저장된 메모 업데이트
+      savedMemo.value = memo.value;
       // 저장 성공 시 임시 메모 삭제
       clearDraftMemo(selectedDate.value);
+      // attendanceInfo 다시 업데이트
+      await updateAttendanceInfo();
+      // 출석 데이터 다시 로드 (색상 업데이트를 위해)
+      await loadAllAttendance();
+      await loadMonthAttendance();
       showSnackbar('저장되었습니다!');
     } catch (error) {
       console.error(error);
@@ -281,6 +408,33 @@ const loadAllAttendance = async () => {
   attendanceMap.value = await window.api.getAllAttendance();
 }
 
+// attendanceInfo 업데이트 함수 (오늘 날짜일 때만)
+const updateAttendanceInfo = async (): Promise<void> => {
+  const todayStr = getTodayStr();
+  
+  // 오늘 날짜가 선택되어 있을 때만 업데이트
+  if (selectedDate.value !== todayStr) {
+    return;
+  }
+
+  // 오늘 날짜의 출석 정보 가져오기
+  const result = await window.api.checkTodayAttendance();
+  
+  // 저장된 메모 가져오기
+  const events = await window.api.getEventsByDate(todayStr);
+  const currentSavedMemo = events && events.length > 0 && events[0]?.memo ? events[0].memo : '';
+  savedMemo.value = currentSavedMemo;
+  
+  // attendanceInfo 업데이트
+  attendanceInfo.value = {
+    date: result.date,
+    checked: result.checked,
+    newlyChecked: result.newlyChecked,
+    checkedAt: result.checkedAt,
+    updatedAt: result.updatedAt
+  };
+}
+
 // Ctrl+S 키보드 단축키 핸들러
 const handleKeyDown = (event: KeyboardEvent) => {
   if (event.ctrlKey && event.key === 's') {
@@ -298,11 +452,29 @@ onMounted(async () => {
   attendanceInfo.value = {
     date: result.date,
     checked: result.checked,
-    newlyChecked: result.newlyChecked
+    newlyChecked: result.newlyChecked,
+    checkedAt: result.checkedAt,
+    updatedAt: result.updatedAt
   };
 
   await loadAllAttendance();
   await loadMonthAttendance();
+  
+  // 오늘 날짜 선택 및 attendanceInfo 초기화
+  const todayStr = getTodayStr();
+  selectedDate.value = todayStr;
+  const events = await window.api.getEventsByDate(todayStr);
+  const currentSavedMemo = events && events.length > 0 && events[0]?.memo ? events[0].memo : '';
+  savedMemo.value = currentSavedMemo;
+  const draftMemo = loadDraftMemo(todayStr);
+  memo.value = draftMemo !== null ? draftMemo : currentSavedMemo;
+  await updateAttendanceInfo();
+
+  // 마크다운 뷰어 토글 상태 불러오기 및 윈도우 자동 열기
+  loadMarkdownViewerToggleState();
+  if (markdownViewerOpen.value) {
+    await window.api.openMarkdownViewer();
+  }
 
   // Ctrl+S 키보드 단축키 등록
   document.addEventListener('keydown', handleKeyDown);
@@ -327,10 +499,10 @@ const handleBeforeUnload = (): void => {
   clearAllDraftMemos();
 };
 
-// 메모 변경 시 자동으로 임시 저장 (디바운싱 적용, 오늘 날짜만)
+// 메모 변경 시 자동으로 임시 저장 및 attendanceInfo 업데이트 (디바운싱 적용, 오늘 날짜만)
 let draftSaveTimeout: ReturnType<typeof setTimeout> | null = null;
 watch(memo, (newMemo) => {
-  // 오늘 날짜일 때만 임시 저장
+  // 오늘 날짜일 때만 임시 저장 및 attendanceInfo 업데이트
   if (selectedDate.value && selectedDate.value === getTodayStr()) {
     // 이전 타이머 취소
     if (draftSaveTimeout) {
@@ -339,6 +511,8 @@ watch(memo, (newMemo) => {
     // 500ms 후에 임시 저장 (사용자가 타이핑을 멈춘 후)
     draftSaveTimeout = setTimeout(() => {
       saveDraftMemo(selectedDate.value!, newMemo);
+      // attendanceInfo 업데이트 (메모 변경 감지)
+      updateAttendanceInfo();
     }, 500);
   }
 });
@@ -346,5 +520,146 @@ watch(memo, (newMemo) => {
 watch([currentYear, currentMonth], () => {
   loadMonthAttendance();
 });
+
+// 마크다운 뷰어 토글 함수
+const toggleMarkdownViewer = async (): Promise<void> => {
+  if (markdownViewerOpen.value) {
+    // 닫기
+    await window.api.closeMarkdownViewer();
+    markdownViewerOpen.value = false;
+    localStorage.setItem(MARKDOWN_VIEWER_TOGGLE_KEY, 'false');
+  } else {
+    // 열기
+    await window.api.openMarkdownViewer();
+    markdownViewerOpen.value = true;
+    localStorage.setItem(MARKDOWN_VIEWER_TOGGLE_KEY, 'true');
+  }
+};
+
+// 마크다운 뷰어 토글 상태 불러오기
+const loadMarkdownViewerToggleState = (): void => {
+  const savedState = localStorage.getItem(MARKDOWN_VIEWER_TOGGLE_KEY);
+  if (savedState === 'true') {
+    markdownViewerOpen.value = true;
+  }
+};
 </script>
+
+<style scoped>
+.memo-textarea :deep(.v-field__input) {
+  max-height: 300px;
+  overflow-y: auto !important;
+}
+
+.markdown-preview {
+  min-height: 200px;
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  border-radius: 4px;
+  background-color: rgb(var(--v-theme-surface));
+}
+
+.markdown-preview :deep(h1) {
+  color: rgb(var(--v-theme-primary));
+  border-bottom: 3px solid rgb(var(--v-theme-primary));
+  padding-bottom: 10px;
+  margin-bottom: 20px;
+  font-size: 1.75rem;
+}
+
+.markdown-preview :deep(h2) {
+  color: rgb(var(--v-theme-on-surface));
+  margin-top: 24px;
+  margin-bottom: 12px;
+  border-bottom: 2px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  padding-bottom: 8px;
+  font-size: 1.5rem;
+}
+
+.markdown-preview :deep(h3) {
+  color: rgb(var(--v-theme-on-surface));
+  margin-top: 20px;
+  margin-bottom: 10px;
+  font-size: 1.25rem;
+}
+
+.markdown-preview :deep(p) {
+  margin-bottom: 12px;
+  line-height: 1.6;
+}
+
+.markdown-preview :deep(a) {
+  color: rgb(var(--v-theme-primary));
+  text-decoration: none;
+}
+
+.markdown-preview :deep(a:hover) {
+  text-decoration: underline;
+}
+
+.markdown-preview :deep(code) {
+  background-color: rgba(var(--v-theme-on-surface), 0.05);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9em;
+}
+
+.markdown-preview :deep(pre) {
+  background-color: rgba(var(--v-theme-on-surface), 0.05);
+  padding: 15px;
+  border-radius: 5px;
+  overflow-x: auto;
+  margin: 15px 0;
+}
+
+.markdown-preview :deep(pre code) {
+  background: none;
+  padding: 0;
+}
+
+.markdown-preview :deep(ul),
+.markdown-preview :deep(ol) {
+  margin-left: 20px;
+  margin-bottom: 12px;
+}
+
+.markdown-preview :deep(li) {
+  margin-bottom: 8px;
+}
+
+.markdown-preview :deep(blockquote) {
+  border-left: 4px solid rgb(var(--v-theme-primary));
+  padding-left: 15px;
+  margin: 15px 0;
+  color: rgba(var(--v-theme-on-surface), 0.7);
+  font-style: italic;
+}
+
+.markdown-preview :deep(table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 15px 0;
+}
+
+.markdown-preview :deep(th),
+.markdown-preview :deep(td) {
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  padding: 8px;
+  text-align: left;
+}
+
+.markdown-preview :deep(th) {
+  background-color: rgba(var(--v-theme-primary), 0.1);
+  font-weight: bold;
+}
+
+.markdown-preview :deep(img) {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  margin: 15px 0;
+}
+</style>
 

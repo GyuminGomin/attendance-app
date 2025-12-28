@@ -42,8 +42,8 @@
         class="calendar-day"
         :class="{
           'calendar-day--today': isToday(day),
-          'calendar-day--attended': isAttended(day),
-          'calendar-day--memo': !isChecked(day) && hasMemo(day),
+          'calendar-day--attended': isAttended(day) && !isDraft(day),
+          'calendar-day--memo': (!isChecked(day) && hasMemo(day)) || isDraft(day),
           'calendar-day--selected': isSelected(day),
         }"
         :variant="isSelected(day) ? 'tonal' : isToday(day) ? 'tonal' : 'text'"
@@ -62,7 +62,7 @@
             class="ml-1"
           />
           <v-icon
-            v-else="hasMemo(day)"
+            v-else-if="hasMemo(day) || isDraft(day)"
             icon="mdi-note-text-outline"
             size="16"
             class="ml-1"
@@ -82,6 +82,7 @@ interface Props {
   attendedDates: string[]; // "YYYY-MM-DD" 배열
   attendanceMap: Record<string, { checked: boolean; memo?: string }>;
   selectedDate: string | null;
+  draftDates?: string[]; // 임시데이터가 있는 날짜 목록 (YYYY-MM-DD 배열)
 }
 const props = defineProps<Props>();
 const emit = defineEmits<{
@@ -136,6 +137,11 @@ function isToday(day: number) {
 function isAttended(day: number) {
   const dateStr = formatDate(day);
   return attendedDates.value.includes(dateStr);
+}
+
+function isDraft(day: number) {
+  const dateStr = formatDate(day);
+  return props.draftDates?.includes(dateStr) || false;
 }
 
 function prevMonth() {
