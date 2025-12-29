@@ -26,5 +26,8 @@ electron_1.contextBridge.exposeInMainWorld('api', {
     },
     readReadme: () => {
         return electron_1.ipcRenderer.invoke('markdown:readReadme');
+    },
+    getTodayMemo: () => {
+        return electron_1.ipcRenderer.invoke('preview:getTodayMemo');
     }
 });

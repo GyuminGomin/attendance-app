@@ -29,14 +29,14 @@
         <template v-else-if="attendanceInfo.checked && attendanceInfo.newlyChecked && memo.trim() === savedMemo.trim()">
           {{ attendanceInfo.date }} · 오늘 새로 저장됨 · {{ formatDateTime(attendanceInfo.checkedAt) }}
         </template>
-        <template v-else-if="attendanceInfo.checked && !attendanceInfo.newlyChecked && memo.trim() !== savedMemo.trim()">
+        <template v-else-if="attendanceInfo.checked && attendanceInfo.newlyChecked && memo.trim() !== savedMemo.trim()">
           {{ attendanceInfo.date }} · 수정중
         </template>
         <template v-else-if="attendanceInfo.checked && !attendanceInfo.newlyChecked && memo.trim() === savedMemo.trim()">
           {{ attendanceInfo.date }} · 수정됨 · 수정: {{ formatDateTime(attendanceInfo.updatedAt) }}
         </template>
         <template v-else>
-          {{ attendanceInfo.date }} · 저장됨
+          {{ attendanceInfo.date }} · 수정중
         </template>
       </v-chip>
     </v-app-bar>
@@ -92,11 +92,11 @@
 
                 <template v-else>
                   <v-tabs v-model="memoTab" density="compact" class="px-3 pt-3">
-                    <v-tab value="edit">
+                    <v-tab value="edit" class="pb-3">
                       <v-icon start>mdi-pencil</v-icon>
                       편집
                     </v-tab>
-                    <v-tab value="preview">
+                    <v-tab value="preview" class="pb-3">
                       <v-icon start>mdi-eye</v-icon>
                       미리보기
                     </v-tab>
@@ -128,7 +128,7 @@
               <v-card-actions class="justify-end">
                 <v-btn
                   color="primary"
-                  :disabled="!selectedDate || saving"
+                  :disabled="!selectedDate || saving || selectedDate !== getTodayStr()"
                   :loading="saving"
                   prepend-icon="mdi-content-save"
                   @click="saveMemo"

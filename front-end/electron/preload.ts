@@ -25,6 +25,9 @@ contextBridge.exposeInMainWorld('api', {
   },
   readReadme: () => {
     return ipcRenderer.invoke('markdown:readReadme');
+  },
+  getTodayMemo: () => {
+    return ipcRenderer.invoke('preview:getTodayMemo');
   }
 });
 
@@ -39,6 +42,7 @@ declare global {
       openMarkdownViewer: () => Promise<{ success: boolean }>;
       closeMarkdownViewer: () => Promise<{ success: boolean }>;
       readReadme: () => Promise<{ success: boolean; content: string }>;
+      getTodayMemo: () => Promise<{ success: boolean; memo: string; date: string }>;
     };
   }
 }

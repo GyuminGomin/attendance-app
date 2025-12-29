@@ -1,5 +1,5 @@
 // electron/main.ts
-import { app, BrowserWindow, ipcMain, Menu } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, Tray, nativeImage } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -9,6 +9,9 @@ const __dirname = path.dirname(__filename); // 현재 파일의 디렉토리 경
 
 let mainWindow: BrowserWindow | null = null; // Ts의 유니온 타입 문법
 let markdownViewerWindow: BrowserWindow | null = null; // 마크다운 뷰어 윈도우
+let previewWindow: BrowserWindow | null = null; // 작은 미리보기 윈도우
+let tray: Tray | null = null; // 트레이 아이콘
+let appIsQuitting = false; // 앱 종료 플래그
 
 function getDataDir() {
   return app.getPath('userData'); // OS별로 앱 데이터를 저장할 기본 디렉터리 (윈도우 : AppData\Roaming\..., 맥 : ~/Library/Application Support/..., 리눅스 : ~/.config/...)
@@ -68,6 +71,14 @@ async function createWindow() {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
 
+  mainWindow.on('close', (event) => {
+    // 윈도우를 닫을 때 완전히 종료하지 않고 트레이로 최소화
+    if (!appIsQuitting) {
+      event.preventDefault();
+      mainWindow?.hide();
+    }
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -110,6 +121,154 @@ function closeMarkdownViewerWindow() {
     markdownViewerWindow.close();
     markdownViewerWindow = null;
   }
+}
+
+// 작은 미리보기 창 생성 (오늘 날짜의 markdown preview)
+async function createPreviewWindow() {
+  if (previewWindow) {
+    previewWindow.focus();
+    return;
+  }
+
+  previewWindow = new BrowserWindow({
+    width: 500,
+    height: 400,
+    frame: true,
+    resizable: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      nodeIntegration: false,
+      contextIsolation: true
+    }
+  });
+
+  // 개발용: Vite dev 서버 주소
+  if (!app.isPackaged) {
+    await previewWindow.loadURL('http://localhost:5173/preview.html');
+  } else {
+    // 빌드된 경우: 미리보기 HTML 파일 로드
+    previewWindow.loadFile(path.join(__dirname, '../dist/preview.html'));
+  }
+
+  previewWindow.on('closed', () => {
+    previewWindow = null;
+  });
+}
+
+function closePreviewWindow() {
+  if (previewWindow) {
+    previewWindow.close();
+    previewWindow = null;
+  }
+}
+
+// 기본 트레이 아이콘 생성 (간단한 아이콘)
+function createDefaultTrayIcon(): Electron.NativeImage {
+  // 16x16 크기의 간단한 아이콘 생성
+  // SVG 문자열을 사용하여 기본 아이콘 생성
+  const svgString = `<svg width="16" height="16" xmlns="http://www.w3.org/2000/svg">
+    <rect width="16" height="16" fill="#1976d2" rx="2"/>
+    <text x="8" y="12" font-size="10" fill="white" text-anchor="middle" font-family="Arial" font-weight="bold">✓</text>
+  </svg>`;
+  
+  try {
+    const buffer = Buffer.from(svgString);
+    return nativeImage.createFromBuffer(buffer);
+  } catch (error) {
+    // SVG 생성 실패 시 빈 이미지 대신 작은 색상 이미지 생성
+    // 1x1 픽셀 PNG를 생성하고 리사이즈
+    const img = nativeImage.createEmpty();
+    return img;
+  }
+}
+
+// 트레이 아이콘 생성 및 설정
+function createTray() {
+  // 트레이 아이콘 경로 찾기
+  let iconPath: string | null = null;
+  
+  if (!app.isPackaged) {
+    // 개발 환경: 여러 경로 시도
+    const possiblePaths = [
+      path.join(__dirname, '../../public/vite.svg'),
+      path.join(process.cwd(), 'public/vite.svg'),
+      path.join(process.cwd(), 'front-end/public/vite.svg')
+    ];
+    
+    for (const possiblePath of possiblePaths) {
+      if (fs.existsSync(possiblePath)) {
+        iconPath = possiblePath;
+        break;
+      }
+    }
+  } else {
+    // 프로덕션 환경: dist 폴더의 vite.svg 사용
+    iconPath = path.join(__dirname, '../dist/vite.svg');
+    if (!fs.existsSync(iconPath)) {
+      iconPath = null;
+    }
+  }
+  
+  let trayIcon: Electron.NativeImage;
+  if (iconPath && fs.existsSync(iconPath)) {
+    try {
+      trayIcon = nativeImage.createFromPath(iconPath);
+      // 트레이 아이콘은 작은 크기로 리사이즈
+      const size = trayIcon.getSize();
+      if (size.width === 0 || size.height === 0) {
+        // SVG가 제대로 로드되지 않은 경우
+        throw new Error('Invalid icon size');
+      }
+      if (size.width > 16 || size.height > 16) {
+        trayIcon = trayIcon.resize({ width: 16, height: 16 });
+      }
+    } catch (error) {
+      console.error('Failed to load tray icon:', error);
+      // 아이콘 로드 실패 시 기본 아이콘 생성
+      trayIcon = createDefaultTrayIcon();
+    }
+  } else {
+    // 아이콘이 없으면 기본 아이콘 생성
+    trayIcon = createDefaultTrayIcon();
+  }
+
+  // 트레이 아이콘 생성
+  try {
+    tray = new Tray(trayIcon);
+    tray.setToolTip('출석 & 일정 기록');
+  } catch (error) {
+    console.error('Failed to create tray:', error);
+    return; // 트레이 생성 실패 시 함수 종료
+  }
+
+  // 트레이 컨텍스트 메뉴 생성
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: '다시 열기',
+      click: () => {
+        if (mainWindow) {
+          mainWindow.show();
+          mainWindow.focus();
+        } else {
+          createWindow();
+        }
+      }
+    },
+    {
+      label: '종료',
+      click: () => {
+        appIsQuitting = true;
+        app.quit();
+      }
+    }
+  ]);
+
+  tray.setContextMenu(contextMenu);
+
+  // 트레이 아이콘 더블클릭 이벤트
+  tray.on('double-click', () => {
+    createPreviewWindow();
+  });
 }
 
 // --- IPC 핸들러 등록
@@ -264,6 +423,16 @@ function registerIpcHandlers() {
       return { success: false, content: '' };
     }
   });
+
+  // 9) 오늘 날짜의 메모 가져오기 (미리보기 창용)
+  ipcMain.handle('preview:getTodayMemo', () => {
+    const today = getTodayStr();
+    const file = getEventsFile();
+    const data = readJson(file);
+    const events = data[today] || [];
+    const memo = events && events.length > 0 && events[0]?.memo ? events[0].memo : '';
+    return { success: true, memo, date: today };
+  });
 }
 
 app.whenReady().then(async () => {
@@ -272,6 +441,7 @@ app.whenReady().then(async () => {
   
   registerIpcHandlers();
   await createWindow();
+  createTray(); // 트레이 아이콘 생성
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -279,5 +449,10 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
+  // 윈도우를 모두 닫아도 앱을 종료하지 않음 (트레이에서 계속 실행)
+  // macOS가 아닌 경우에도 트레이에서 계속 실행
+});
+
+app.on('before-quit', () => {
+  appIsQuitting = true;
 });

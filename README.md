@@ -43,9 +43,43 @@
     - 다른 날짜는 수정이 불가능하므로 임시데이터 필요가 없음
     - 오늘 날짜에서 갑자기 다른 날짜가 보고 싶을 때, 임시데이터 유지 장치
 
-7. markdown 뷰로 볼 수 있게 설정
+7. electron 기본 메뉴탭 삭제
 
+8. v-chip 상태 표시
+  - 저장되지 않음 (앱은 시작했지만, 저장하지 않음, 메모 없음)
+  - 수정중 (메모는 있지만, 저장하지 않음, 첫 작성 중)
+  - 오늘 새로 저장됨 (처음 저장 완료)
+  - 수정중 (저장된 후 메모를 수정 중, 임시데이터인 상태)
+  - 수정됨 (저장된 메모를 수정 후 다시 저장 완료)
+
+9. markdown 뷰로 볼 수 있게 설정
+
+10. README.md 설명서 페이지 추가 (X 제거 및 이동가능한 드래그 탭 생성)
+
+11. 시작프로그램(백그라운드에서 지속 실행 - 작은 메뉴 탭 만들기)
+
+11. microsoft store에 배포 가능한지 확인해보고 배포 해보고 (github release에도 배포 가능한지 확인)
 
 - 강의를 듣기 전에 일단 안풀려서 짜증이 나더라도 오랜시간 생각을 거듭해서 문제 해결을 다 하고 이 앱이 완료되면, vue 강의를 추가로 더 듣자 (이러는 게 더 메리트있을 것 같다는 생각)
 (Why ? - 현재 제작하고 있는 앱은 내 삶에 도움이 됨과 동시에 어렵지 않은 앱이기 때문)
+```
+
+# ts
+
+## lib.dom.d.ts
+
+### localStorage
+- 브라우저의 Web Storage API 중 Local Storage를 TypeScript 타입으로 정의한 것
+```
+key, value
+
+localStorage.setItem(string, string);
+localStorage.getItem(string);
+
+ex.
+localStroage.setItem('Key', 'Value');
+const val = localStorage.getItem('Key');
+console.log(val);
+
+-> 'Value'
 ```

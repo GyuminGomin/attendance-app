@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>오늘의 메모 미리보기</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        line-height: 1.6;
+        color: #333;
+        background: #ffffff;
+        padding: 10px;
+        overflow-y: auto;
+      }
+      
+      .header {
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #1976d2;
+      }
+      
+      .header h2 {
+        color: #1976d2;
+        font-size: 1.2rem;
+        margin: 0;
+      }
+      
+      .date {
+        color: #666;
+        font-size: 0.9rem;
+        margin-top: 5px;
+      }
+      
+      .content {
+        min-height: 100px;
+      }
+      
+      .empty {
+        color: #999;
+        text-align: center;
+        padding: 40px 20px;
+        font-style: italic;
+      }
+      
+      h1 {
+        color: #1976d2;
+        border-bottom: 2px solid #1976d2;
+        padding-bottom: 8px;
+        margin-bottom: 15px;
+        font-size: 1.3rem;
+      }
+      
+      h2 {
+        color: #424242;
+        margin-top: 20px;
+        margin-bottom: 10px;
+        font-size: 1.1rem;
+        border-bottom: 1px solid #e0e0e0;
+        padding-bottom: 5px;
+      }
+      
+      h3 {
+        color: #616161;
+        margin-top: 15px;
+        margin-bottom: 8px;
+        font-size: 1rem;
+      }
+      
+      p {
+        margin-bottom: 10px;
+      }
+      
+      a {
+        color: #1976d2;
+        text-decoration: none;
+      }
+      
+      a:hover {
+        text-decoration: underline;
+      }
+      
+      code {
+        background: #f5f5f5;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-family: 'Courier New', monospace;
+        font-size: 0.9em;
+      }
+      
+      pre {
+        background: #f5f5f5;
+        padding: 12px;
+        border-radius: 5px;
+        overflow-x: auto;
+        margin: 12px 0;
+        font-size: 0.9em;
+      }
+      
+      pre code {
+        background: none;
+        padding: 0;
+      }
+      
+      ul, ol {
+        margin-left: 20px;
+        margin-bottom: 10px;
+      }
+      
+      li {
+        margin-bottom: 6px;
+      }
+      
+      blockquote {
+        border-left: 4px solid #1976d2;
+        padding-left: 12px;
+        margin: 12px 0;
+        color: #666;
+        font-style: italic;
+      }
+      
+      .loading {
+        text-align: center;
+        padding: 30px;
+        color: #666;
+      }
+      
+      .error {
+        color: #d32f2f;
+        padding: 15px;
+        background: #ffebee;
+        border-radius: 5px;
+        margin: 15px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h2>오늘의 메모</h2>
+      <div class="date" id="dateDisplay"></div>
+    </div>
+    <div class="content" id="content">
+      <div class="loading">로딩 중...</div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
+    <script>
+      async function loadTodayMemo() {
+        const contentDiv = document.getElementById('content');
+        const dateDisplay = document.getElementById('dateDisplay');
+        
+        try {
+          // Electron API를 통해 오늘 날짜의 메모 읽기
+          if (window.api && window.api.getTodayMemo) {
+            const result = await window.api.getTodayMemo();
+            if (result.success) {
+              // 날짜 표시
+              if (dateDisplay) {
+                dateDisplay.textContent = result.date;
+              }
+              
+              // 메모가 있으면 마크다운으로 변환하여 표시
+              if (result.memo && result.memo.trim()) {
+                const html = marked.parse(result.memo);
+                contentDiv.innerHTML = html;
+                contentDiv.className = 'content';
+              } else {
+                contentDiv.className = 'empty';
+                contentDiv.textContent = '오늘 작성된 메모가 없습니다.';
+              }
+            } else {
+              contentDiv.className = 'error';
+              contentDiv.textContent = '메모를 불러올 수 없습니다.';
+            }
+          } else {
+            // 개발 환경에서 직접 시도
+            contentDiv.className = 'error';
+            contentDiv.textContent = 'Electron API를 사용할 수 없습니다.';
+          }
+        } catch (error) {
+          console.error('Error loading today memo:', error);
+          contentDiv.className = 'error';
+          contentDiv.textContent = '오류가 발생했습니다: ' + error.message;
+        }
+      }
+      
+      // marked와 window.api가 로드될 때까지 대기
+      function tryLoadMemo() {
+        if (typeof marked !== 'undefined') {
+          // window.api가 아직 로드되지 않았을 수 있으므로 약간의 지연 후 시도
+          if (window.api && window.api.getTodayMemo) {
+            loadTodayMemo();
+          } else {
+            // window.api가 로드될 때까지 대기 (최대 2초)
+            let attempts = 0;
+            const maxAttempts = 20;
+            const checkApi = setInterval(() => {
+              attempts++;
+              if (window.api && window.api.getTodayMemo) {
+                clearInterval(checkApi);
+                loadTodayMemo();
+              } else if (attempts >= maxAttempts) {
+                clearInterval(checkApi);
+                contentDiv.className = 'error';
+                contentDiv.textContent = 'API를 로드할 수 없습니다.';
+              }
+            }, 100);
+          }
+        } else {
+          // marked가 로드되지 않았으면 에러 표시
+          const contentDiv = document.getElementById('content');
+          contentDiv.className = 'error';
+          contentDiv.textContent = '마크다운 라이브러리를 로드할 수 없습니다.';
+        }
+      }
+      
+      // DOM이 로드된 후 실행
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', tryLoadMemo);
+      } else {
+        tryLoadMemo();
+      }
+      
+      // 주기적으로 메모 업데이트 (30초마다)
+      setInterval(() => {
+        if (window.api && window.api.getTodayMemo) {
+          loadTodayMemo();
+        }
+      }, 30000);
+    </script>
+  </body>
+</html>
+

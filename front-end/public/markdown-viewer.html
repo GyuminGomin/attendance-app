@@ -17,7 +17,7 @@
         line-height: 1.6;
         color: #333;
         background: #f5f5f5;
-        padding: 20px;
+        padding: 60px 20px 20px 20px; /* 타이틀 바 높이(40px) + 여백(20px) */
       }
       
       .container {
@@ -114,9 +114,53 @@
         border-radius: 5px;
         margin: 20px 0;
       }
+      
+      /* 드래그 가능한 타이틀 바 */
+      .title-bar {
+        -webkit-app-region: drag;
+        height: 40px;
+        background: #1976d2;
+        display: flex;
+        align-items: center;
+        padding: 0 15px;
+        color: white;
+        font-weight: 500;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 1000;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      
+      .title-bar-title {
+        flex: 1;
+        user-select: none;
+      }
+/*       
+      .title-bar-close {
+        -webkit-app-region: no-drag;
+        background: transparent;
+        border: none;
+        color: white;
+        cursor: pointer;
+        padding: 5px 10px;
+        font-size: 16px;
+        line-height: 1;
+        border-radius: 4px;
+        transition: background-color 0.2s;
+      }
+      
+      .title-bar-close:hover {
+        background-color: rgba(255, 255, 255, 0.2);
+      } */
     </style>
   </head>
   <body>
+    <div class="title-bar">
+      <div class="title-bar-title">README - 마크다운 뷰어</div>
+      <!-- <button class="title-bar-close" id="closeBtn" title="닫기">✕</button> -->
+    </div>
     <div class="container">
       <div id="content" class="loading">로딩 중...</div>
     </div>
@@ -190,11 +234,32 @@
         }
       }
       
+      // 닫기 버튼 이벤트 설정 함수
+      // function setupCloseButton() {
+      //   const closeBtn = document.getElementById('closeBtn');
+      //   if (closeBtn) {
+      //     closeBtn.addEventListener('click', () => {
+      //       if (window.api && window.api.closeMarkdownViewer) {
+      //         window.api.closeMarkdownViewer();
+      //       } else {
+      //         // 개발 환경에서 직접 윈도우 닫기 (Electron 없이 테스트하는 경우)
+      //         if (window.close) {
+      //           window.close();
+      //         }
+      //       }
+      //     });
+      //   }
+      // }
+      
       // DOM이 로드된 후 실행
       if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', tryLoadReadme);
+        document.addEventListener('DOMContentLoaded', () => {
+          tryLoadReadme();
+          setupCloseButton();
+        });
       } else {
         tryLoadReadme();
+        // setupCloseButton();
       }
     </script>
   </body>
